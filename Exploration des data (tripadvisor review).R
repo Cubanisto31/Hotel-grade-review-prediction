@@ -41,26 +41,24 @@ df <- df %>%
 
 
 #Tableau de contingence entre le nombre de lettres et le nombre de mots 
-a <- table(df$class_Ch_N, df$class_W_N)
-
-#Voir si je ne peux pas un peu optimiser ce bout infra
-a <- as.data.frame(a)  
+tab_conting <- table(df$class_Ch_N, df$class_W_N) %>% 
+  as.data.frame()
 
 # Réordonner les modalités de Var1 dans un ordre spécifique
-a$Var1 <- factor(a$Var1, levels = c("Très petit", "Petit", "Grand", "Très grand"))
+tab_conting$Var1 <- factor(tab_conting$Var1, levels = c("Très petit", "Petit", "Grand", "Très grand"))
 
 # Trier les lignes du dataframe selon l'ordre de Var1
-a <- a %>%
+tab_conting <- tab_conting %>%
   arrange(Var1)
 
-a$Var2 <- factor(a$Var2, levels = c("Très petit", "Petit", "Grand", "Très grand"))
+tab_conting$Var2 <- factor(tab_conting$Var2, levels = c("Très petit", "Petit", "Grand", "Très grand"))
 
 # Trier les lignes du dataframe selon l'ordre de Var2
-a <- a %>%
+tab_conting <- tab_conting %>%
   arrange(Var2)
 
 # Tracer le tableau de contingence 
-ggplot(a, aes(x = Var1, y= Var2, fill= Freq)) +
+ggplot(tab_conting, aes(x = Var1, y= Var2, fill= Freq)) +
   geom_tile() +
   scale_fill_gradient(low = "white", high = "red") +
   labs(x = "Character_number", y = "Word_number", title = "Tableau de contingence nombre de lettres vs nombre de mots") +
@@ -68,10 +66,7 @@ ggplot(a, aes(x = Var1, y= Var2, fill= Freq)) +
 
 
 #Tracer la répartition des notes attribuées 
-grade_rep <- table(df$Rating) 
-
-grade_rep <- as.data.frame(grade_rep)
-
+grade_rep <- table(df$Rating) %>% as.data.frame()
 
 ggplot(grade_rep, aes(x = Var1, y = Freq ))+
   geom_bar(stat = "identity", fill = "skyblue", color = "black") +
@@ -79,3 +74,61 @@ ggplot(grade_rep, aes(x = Var1, y = Freq ))+
   theme_minimal()
 
 
+#Tracer la répartition des notes en fonction du nombre de charactères 
+ggplot(df, aes( x = character_number, y = Rating))+
+  geom_point(stat = "identity", color = "black")+
+  labs(title = "Répartition des notes en fonction du nombre de charactères", x= "Nombre de charactères", y="Notes")+
+  theme_minimal()
+
+
+
+#Tracer la fréquence des commentaires en fonction de leur note
+grade_by_size <- table(df$Rating, df$class_Ch_N) %>% as.data.frame()
+
+ggplot(grade_by_size, aes(x = Var1, y = Freq, fill = Var2 ))+
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  labs(title = "Distribution des notes", x = "Note", y = "Fréquence") +
+  theme_minimal()
+#Il semble que les class_ch sont réparties de manière similaire au sein des notes 
+
+#Ajouter des colonnes qui permettent de voir la répartition des notes dans chaque class de commentaires (Class_ch_number)
+grade_by_size <- grade_by_size %>% 
+  group_by(Var2) %>% 
+  mutate(prop_rate_by_size = Freq / sum(Freq)) %>% 
+  ungroup()  
+
+grade_by_size <- grade_by_size %>% 
+  mutate(percent_rate_by_size = round(prop_rate_by_size * 100, 2))
+
+#Ajouter des colonnes qui permettent de voir la répartition des class de commentaires  dans chaque note
+grade_by_size <- grade_by_size %>% 
+  group_by(Var1) %>% 
+  mutate(prop_size_by_rate = Freq / sum(Freq)) %>% 
+  ungroup()  
+
+grade_by_size <- grade_by_size %>% 
+  mutate(percent_size_by_rate = round(prop_size_by_rate * 100, 2))
+
+# Création des diagrammes en camembert pour observer la part des notes dans les class de commentaires 
+ggplot(grade_by_size, aes(x = "", y = percent_rate_by_size, fill = Var1)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +  # Barres empilées
+  coord_polar(theta = "y") +                                # Transformation en camembert
+  facet_wrap(~Var2) +                                       # Un camembert par modalité de Var2
+  labs(title = "Proportion des notes par taille de commentaire",
+       fill = "Notes",
+       x = NULL,
+       y = NULL) +
+  theme_void() +                                            # Thème minimaliste pour camembert
+  theme(legend.position = "bottom")
+
+# Création des diagrammes en camembert pour observer la part des class de commentaires dans les notes
+ggplot(grade_by_size, aes(x = "", y = percent_size_by_rate, fill = Var2)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +  # Barres empilées
+  coord_polar(theta = "y") +                                # Transformation en camembert
+  facet_wrap(~Var1) +                                       # Un camembert par modalité de Var2
+  labs(title = "Proportion des tailles de commentaire par notes",
+       fill = "Taille de commentaires",
+       x = NULL,
+       y = NULL) +
+  theme_void() +                                            # Thème minimaliste pour camembert
+  theme(legend.position = "bottom")
