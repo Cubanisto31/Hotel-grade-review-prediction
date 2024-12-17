@@ -2,6 +2,8 @@ library(dplyr)
 library(ggplot2)
 library(formattable)
 library(readr)
+library(tidyr)
+
 
 ## Ce script permet de manipuler la df pour préparer l'estimation économétrique des notes 
 
@@ -132,3 +134,21 @@ ggplot(grade_by_size, aes(x = "", y = percent_size_by_rate, fill = Var2)) +
        y = NULL) +
   theme_void() +                                            # Thème minimaliste pour camembert
   theme(legend.position = "bottom")
+
+
+#S'intéresser au distribution des classes de tailles de commentaire pour chaque note
+
+contingence_table <- grade_by_size[,c(1, 2, 7)]
+
+contingence_table <- contingence_table %>% 
+  pivot_wider(names_from = Var2, values_from = percent_size_by_rate) %>%
+  select(-Var1) %>%
+  as.matrix()
+
+# Test du Chi²
+chi2_result <- chisq.test(contingence_table)
+print(chi2_result)
+
+#p-value = 0,74 > 0,05 ; je ne peux pas rejeter H0 (avec un seuil d'erreur à 5%) selon laquelle la répartition des tailles des messages pour chaque note serait dûe au hasard
+
+
