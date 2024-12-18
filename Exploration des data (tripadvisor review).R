@@ -4,8 +4,13 @@ library(formattable)
 library(readr)
 library(tidyr)
 
+#########################
+## Ce script a pour objectif de (i) préparer la df et (ii) visualiser la repartition des tailles de commentaires parmi les notes attribuées (1-5)
+#########################
 
-## Ce script permet de manipuler la df pour préparer l'estimation économétrique des notes 
+##############
+#(i) Préparation de la df
+##############
 
 #Importer la base de données 
 tripadvisor_hotel_reviews <- read_csv("tripadvisor_hotel_reviews.csv")
@@ -59,12 +64,15 @@ tab_conting$Var2 <- factor(tab_conting$Var2, levels = c("Très petit", "Petit", 
 tab_conting <- tab_conting %>%
   arrange(Var2)
 
+
 # Tracer le tableau de contingence 
 ggplot(tab_conting, aes(x = Var1, y= Var2, fill= Freq)) +
   geom_tile() +
   scale_fill_gradient(low = "white", high = "red") +
   labs(x = "Character_number", y = "Word_number", title = "Tableau de contingence nombre de lettres vs nombre de mots") +
   theme_minimal()
+
+
 
 
 #Tracer la répartition des notes attribuées 
