@@ -1,9 +1,3 @@
----
-editor_options:
-  markdown:
-    wrap: 72
----
-
 # Hotel grade review prediction
 
 *This repository aims to explore different ways to predict a grade that
@@ -17,4 +11,8 @@ Data comes from
 *The first step was to examine the distribution of review lengths among
 the comment ratings.*
 
+To do :
+- Terminer les différentes approches
+- Faire un .md Clean
+- Faire une présentation Latex 
 
