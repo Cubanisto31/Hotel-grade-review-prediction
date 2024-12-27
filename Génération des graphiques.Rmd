@@ -1,5 +1,5 @@
 ---
-title: "Génération des graphiques pour présentation tripadvisor reviews"
+title: "Génération des graphiques"
 author: "Paul Favier"
 date: "`r Sys.Date()`"
 output:
