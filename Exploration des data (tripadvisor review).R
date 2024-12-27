@@ -26,6 +26,7 @@ df <- df %>%
 df <- df %>% 
   mutate(W_length_mean = round(character_number / words_number))
 
+#Eventuellement faire un graphique pour montrer qu'il n'y a pas beacoup de variance dans la longueur des mots dans les commentaires 
 table(df$W_length_mean)
 
 df <- df %>% 
@@ -81,7 +82,8 @@ grade_rep <- table(df$Rating) %>% as.data.frame()
 ggplot(grade_rep, aes(x = Var1, y = Freq ))+
   geom_bar(stat = "identity", fill = "skyblue", color = "black") +
   labs(title = "Distribution des notes", x = "Note", y = "Fréquence") +
-  theme_minimal()
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5))
 
 
 #Tracer la répartition des notes en fonction du nombre de charactères 

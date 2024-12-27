@@ -1,0 +1,81 @@
+---
+title: "Génération des graphiques pour présentation tripadvisor reviews"
+author: "Paul Favier"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(formattable)
+library(readr)
+library(tidyr)
+```
+
+## Importer les données et construire les variables
+
+```{r, echo=FALSE}
+#Importer la base de données 
+tripadvisor_hotel_reviews <- read_csv("tripadvisor_hotel_reviews.csv")
+
+df <- tripadvisor_hotel_reviews
+ 
+df <- df %>% 
+  mutate(character_number = nchar(df$Review)) %>% 
+  mutate(words_number = sapply(strsplit(df$Review, "\\s+"), length))
+
+# Ajouter variable longueur moyenne des mots 
+df <- df %>% 
+  mutate(W_length_mean = round(character_number / words_number))
+
+#Eventuellement faire un graphique pour montrer qu'il n'y a pas beacoup de variance dans la longueur des mots dans les commentaires 
+table(df$W_length_mean)
+
+df <- df %>% 
+  mutate(
+    class_Ch_N = case_when(
+      character_number <= 337 ~ "Très petit",
+      character_number <= 535 ~ "Petit",
+      character_number <= 857 ~ "Grand",
+      TRUE ~ "Très grand"))
+
+df <- df %>%
+  mutate(
+    class_W_N = case_when(
+      words_number <= 48 ~ "Très petit",
+      words_number <= 77 ~ "Petit",
+      words_number <= 124 ~ "Grand",
+      TRUE ~ "Très grand"))
+
+
+```
+
+## Exploration des données
+
+```{r, echo=FALSE}
+#Tracer la répartition des notes attribuées 
+grade_rep <- table(df$Rating) %>% as.data.frame()
+```
+
+```{r}
+ggplot(grade_rep, aes(x = Var1, y = Freq ))+
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  labs(title = "Distribution des notes", x = "Note", y = "Fréquence") +
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
