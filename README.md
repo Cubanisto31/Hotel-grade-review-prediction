@@ -16,7 +16,7 @@ Le dépôt contient quatre fichiers (hors README.md).
 Ce fichier est la présentation permettant de restituer le travail réalisé dans le cadre de ce cas pratique. Il synthétise les grands messages et les résultats. **À lire en priorité**.
 
 ### Presentation vF.Rmd
-Ce fichier est le code au format Rmd qui permet de généré le pdf mentionné _supra_. 
+Ce fichier est le code au format Rmd qui permet de générer le pdf mentionné _supra_. 
 
 ### Exploration des data v2.R 
 Ce fichier est le code brut qui a permis d'alimenter la première partie du ficher mentionné _supra_ relative à l'estimation des notes par taille de commentaire. 
