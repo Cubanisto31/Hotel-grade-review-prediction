@@ -7,7 +7,7 @@ Officieusement ce projet était surtout un cas pratique me permettant de
 reprendre en main différents outils tels que R et Rmd.*
 
 La base de données New_Delhi_reviews provient de 
-[Kaggle][https://www.kaggle.com/datasets/arnabchaki/tripadvisor-reviews-2023].
+[Kaggle]([https://www.kaggle.com/datasets/arnabchaki/tripadvisor-reviews-2023]).
 
 ## Structure du dépôt
 Le dépôt contient quatre fichiers (hors README.md).
