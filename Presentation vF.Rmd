@@ -1,0 +1,652 @@
+---
+title: "Prédiction de notes tripadvisor vF"
+subtitle: "Projet d'initiation aux différents outils"
+author: "Paul FAVIER"
+date: "`r Sys.Date()`"
+output:
+  beamer_presentation:
+    theme: "Madrid" # Remplacez par votre thème préféré
+    colortheme: "dolphin"
+    fonttheme: "structurebold"
+    slide_level: 2
+    latex_engine: xelatex  # Meilleur support des caractères spéciaux
+    keep_tex: true        # Utile pour le débogage
+
+header-includes:
+  - \setbeamertemplate{navigation symbols}{} # Supprime les symboles de navigation
+  - \setbeamersize{text margin left=5pt,text margin right=5pt}
+  - \usepackage{listings}
+  - \lstset{breaklines=true}  # Permet le retour à la ligne automatique
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width = 10, fig.height = 6, out.width = "100%", dpi = 300, echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(formattable)
+library(readr)
+library(tidyr)
+library(knitr)
+library(kableExtra)
+```
+
+\frametitle{Table des matières}
+\tableofcontents
+
+# Introduction
+
+\begin{block}{Objectif}    
+ \textbf{Officiellement} ce projet a pour objectif d'explorer la relation qu'il existe entre un commentaire et la note que les clients laissent sur Tripadvisor. 
+
+\textbf{Officieusement} ce projet était surtout un cas pratique me permettant de reprendre en main différents outils tels que R et Rmd. 
+\end{block}
+
+## Introduction
+
+\begin{block}{Base de données}
+La base de données est composée de 147 579 commentaires d'hôtel avec la note associée qui proviendraient de Tripadvisor (source de la base de données sur \href{https://www.kaggle.com/datasets/arnabchaki/tripadvisor-reviews-2023}{\textcolor{blue}{Kaggle}}).
+\end{block}
+
+## Introduction
+
+\begin{block}{Méthodologies}
+Deux méthodologies ont été mises en place :
+\begin{itemize}
+    \item estimation par taille de commentaire ;
+    \item estimation par fouille de texte (\textit{text mining}).
+\end{itemize}
+
+\end{block}
+
+# Analyse exploratoire des données
+
+## La base de données
+
+```{r cache=TRUE, include=FALSE}
+#Importer la base de données 
+df  <- read_csv("New_Delhi_reviews.csv")
+
+#Mettre en forme pour pouvoir recycler le code de la v1 
+df <- df[, c(2, 1)]
+
+colnames(df) <- c("Review", "Rating")
+
+df <- na.omit(df)
+```
+
+```{r Summary df, echo=FALSE}
+summary(df)
+```
+
+## Exemples de commentaires
+
+```{r echo=FALSE, cache=TRUE}
+# Tronquer les valeurs trop longues
+tableau_tronque <- df %>%
+  mutate(review = substr(Review, 1, 40)) # Tronque la colonne "review" à 30 caractères
+
+# Supprimer la première colonne
+tableau_tronque <- tableau_tronque %>% select(-1)
+
+# Réorganiser les colonnes
+tableau_tronque <- tableau_tronque %>% select(2, 1)
+head(tableau_tronque)
+```
+
+## La répartition des notes
+
+```{r, include=FALSE, cache=TRUE}
+df <- df %>% 
+  mutate(character_number = nchar(df$Review)) %>% 
+  mutate(words_number = sapply(strsplit(df$Review, "\\s+"), length))
+
+
+
+#Création des classes des tailles de commentaires 
+df <- df %>% 
+  mutate(
+    class_Ch_N = case_when(
+      character_number <= 163 ~ "Très petit",
+      character_number <= 263 ~ "Petit",
+      character_number <= 462 ~ "Grand",
+      TRUE ~ "Très grand"))
+
+
+
+df <- df %>%
+  mutate(
+    class_W_N = case_when(
+      words_number <= 29 ~ "Très petit",
+      words_number <= 47 ~ "Petit",
+      words_number <= 84 ~ "Grand",
+      TRUE ~ "Très grand"))
+
+
+```
+
+```{r cache=TRUE, include=FALSE}
+#Tracer la répartition des notes attribuées 
+grade_rep <- table(df$Rating) %>% as.data.frame()
+```
+
+```{r, echo=FALSE, cache=TRUE}
+ggplot(grade_rep, aes(x = Var1, y = Freq ))+
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  labs(title = "Distribution des notes", x = "Note", y = "Fréquence") +
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## La répartition des notes
+
+```{r echo=FALSE}
+colnames(grade_rep) <- c("Rate", "Freq")
+grade_rep 
+```
+
+# Estimation par taille de commentaire
+
+L'idée est de regarder comment est répartie la longueur des commentaires (par nombre de caractères et par nombre de mots) afin de créer quatre classes de même taille ("très petit", "petit", "grand", "très grand").
+
+```{r, echo=TRUE, cache=TRUE}
+summary(df$character_number)
+```
+
+```{r, echo=T, cache=TRUE}
+summary(df$words_number)
+```
+
+## Estimation par taille de commentaire
+
+\begin{alertblock}{Potentielle limite} 
+J'ai décidé arbitrairement, sur la base des quartiles \textit{infra}, quelles seraient les bornes des classes. Un autre échantillon aurait probablement donné des catégories bornées par des nombres de caractères et de mots différents.  
+\end{alertblock}
+
+## Vérifier la cohérence
+
+Après avoir construit des catégories de taille de commentaires selon deux critères, je regarde si ces indicateurs convergent.
+
+```{r, echo=FALSE, cache=TRUE}
+#Tableau de contingence entre le nombre de lettres et le nombre de mots 
+tab_conting <- table(df$class_Ch_N, df$class_W_N) %>% 
+  as.data.frame()
+
+# Réordonner les modalités de Var1 dans un ordre spécifique
+tab_conting$Var1 <- factor(tab_conting$Var1, levels = c("Très petit", "Petit", "Grand", "Très grand"))
+
+# Trier les lignes du dataframe selon l'ordre de Var1
+tab_conting <- tab_conting %>%
+  arrange(Var1)
+
+tab_conting$Var2 <- factor(tab_conting$Var2, levels = c("Très petit", "Petit", "Grand", "Très grand"))
+
+# Trier les lignes du dataframe selon l'ordre de Var2
+tab_conting <- tab_conting %>%
+  arrange(Var2)
+
+# Tracer le tableau de contingence 
+ggplot(tab_conting, aes(x = Var1, y= Var2, fill= Freq)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "red") +
+  labs(x = "Character_number", y = "Word_number") +
+  theme_minimal()
+```
+
+## Vérifier la cohérence
+
+On constate dans le tableau \textit{infra} que la grande majorité des commentaires emploient des mots d'une taille moyenne comprise entre 5 et 7 caractères.
+
+```{r echo=FALSE, cache=TRUE}
+df <- df %>% 
+  mutate(W_length_mean = round(character_number / words_number))
+
+table(df$W_length_mean)
+```
+
+\begin{alertblock}{Potentielle limite} Il s'agit d'une taille moyenne de mot par commentaire faite un peu "brutalement" (=nb de caractères / nombre de mots). Il pourrait être intéressant de regarder la répartition de la taille des mots au sein de chaque commentaire et ainsi pouvoir observer une éventuelle corrélation entre l'utilisation de mots longs et une bonne note par exemple.
+\end{alertblock}
+
+# Répartition des longueurs de commentaires parmi les notes
+
+## Répartition des longueurs de commentaires parmi les notes
+
+```{r, echo=F, cache=TRUE}
+#Tracer la répartition des notes en fonction du nombre de charactères 
+ggplot(df, aes( x = character_number, y = Rating))+
+  geom_point(stat = "identity", color = "black")+
+  labs(x= "Nombre de charactères", y="Notes")+
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Pour rappel
+
+```{r,echo=F}
+grade_rep
+```
+
+```{r echo=FALSE}
+
+#Tracer la fréquence des commentaires en fonction de leur note
+grade_by_size <- table(df$Rating, df$class_Ch_N) %>% as.data.frame()
+
+
+#Tracer la fréquence des commentaires en fonction de leur note grade_by_size <- table(df$Rating, df$class_Ch_N) %>% as.data.frame()
+
+grade_by_size <- grade_by_size %>% group_by(Var2) %>% mutate(prop_rate_by_size = Freq / sum(Freq)) %>% ungroup()
+
+grade_by_size <- grade_by_size %>% mutate(percent_rate_by_size = round(prop_rate_by_size * 100, 2))
+
+#Ajouter des colonnes qui permettent de voir la répartition des class de commentaires dans chaque note 
+
+grade_by_size <- grade_by_size %>% group_by(Var1) %>% mutate(prop_size_by_rate = Freq / sum(Freq)) %>% ungroup()
+
+grade_by_size <- grade_by_size %>% mutate(percent_size_by_rate = round(prop_size_by_rate * 100, 2))
+```
+
+## Proportion des longueurs de commentaires parmi les notes
+
+```{r, echo=FALSE, cache=TRUE}
+
+ggplot(grade_by_size, aes(x = "", y = percent_size_by_rate, fill = Var2)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +  # Barres empilées
+  coord_polar(theta = "y") +                                # Transformation en camembert
+  facet_wrap(~Var1) +                                       # Un camembert par modalité de Var2
+  labs(fill = "Taille de commentaires",
+       x = NULL,
+       y = NULL) +
+  theme_void() +                                            # Thème minimaliste pour camembert
+  theme(legend.position = "bottom")+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Test statistique
+
+\begin{alertblock}{Chi 2}
+Il faut vérifier si cette répartition est lié à une interdépendance des variables. Pour ce faire, un test du chi 2 est réalisé.
+\end{alertblock}
+
+```{r echo=FALSE, cache=TRUE}
+#S'intéresser au distribution des classes de tailles de commentaire pour chaque note
+
+contingence_table <- grade_by_size[,c(1, 2, 7)]
+
+contingence_table <- contingence_table %>% 
+  pivot_wider(names_from = Var2, values_from = percent_size_by_rate) %>%
+  select(-Var1)
+  
+contingence_table_mtrx <- as.matrix(contingence_table)
+
+# Test du Chi²
+chi2_result <- chisq.test(contingence_table_mtrx)
+print(chi2_result)
+```
+
+## Conclusion
+
+À partir de ces données et selon la méthode présentée précedemment, dans la mesure où la valeur calculée du Chi-2 est supérieure à la valeur du Chi-2 théorique pour 12 degrès de liberté au seuil de 0,05 (26,72 \> 21,026), l'hypothèse H0 d'indépendance entre la variable la taille d'un commentaire et la note attribuée peut être rejetée. Autrement dit, \textbf{il existe une corrélation entre la taille d'un commentaire et la note attribuée}.
+
+\begin{alertblock}{Orientation}
+En l'espèce, ce travail travail n'explore pas plus en détail la corrélation qu'il existerait entre la taille d'un commentaire et la note qui lui est attribuée. Cela est toutefois un sujet qu'il peut être intéressant d'investiguer.
+\end{alertblock}
+
+# Observation de la fréquence d'apparition des différents mots dans le corpus
+
+L'idée est de s'intéresser à la fréquence d'apparition des mots qui constituent chaque commentaire, dans chaque note attribuée.
+
+L'intuition est que des mots positifs devraient être sureprésentés dans les bonnes notes (et inversement) ainsi l'apparition de ces mots dans un commentaire devraient donner des indices sur la note qui a été attribuée à ce commentaire.
+
+## Observation de la fréquence d'apparition des différents mots dans le corpus
+
+Je commence par :
+
+-   mettre en forme toute la df (uniformisation de la casse, remplacement de la ponctuation et des chiffres par des espaces, suppression des espaces multiples) ;
+
+-   découper ma df par mot (je la tokenise), ce qui donne une df de 10 712 979 observations et deux variables : "Rating" et "word" ;
+
+-   supprimer les mots trop courants qui n'apportent pas de sens particulier (stop words) tels que : "me", "you", "he", "will" etc.. (il s'agit d'une liste de 175 mots que intégrée dans la fonction get_stopwords() du package tidytext) et les mots d'un seul caractère.
+
+```{r include=FALSE}
+library(tidyverse)
+library(tidytext)
+library(caret)
+library(wordcloud)
+library(tm)
+library(syuzhet)
+library(dplyr)
+library(ggplot2)
+library(textrecipes)
+```
+
+```{r include=FALSE}
+#Importer la base de données 
+df  <- read_csv("New_Delhi_reviews.csv")
+#Mettre en forme pour pouvoir recycler le code de la v1 
+df <- df[, c(2, 1)]
+
+colnames(df) <- c("Review", "Rating")
+
+df <- na.omit(df)
+
+#Mise au format
+df$Rating <- as.factor(df$Rating)
+
+
+```
+
+```{r Tokenisation et nettoyage des stopwords, include=FALSE, cache=TRUE}
+
+#Préparation des données pour l'analyse textuelle
+df_words <- df %>% 
+  mutate(
+    Review = tolower(Review), #Conversion de tout le texte en minuscules
+    Review = str_replace_all(Review, "[[:punct:]]", " " ), #Remplacement de toute la ponctuation par des espaces
+    Review = str_replace_all(Review, "[[:digit:]]", " "), #Remplacement de tous les chiffres par des espaces
+    Review = str_squish(Review) #Suppression des espaces multiples et des espaces en début/fin de texte
+  )
+
+#On tokenise par mot, chaque mot du corpus obtient donc une fréquence pour chaque note  
+df_words <- df_words %>% 
+  unnest_tokens(word, Review)
+
+#Suppression des mots trop courants qui n'apportent pas de sens particulier
+stopwords_list <- get_stopwords()
+
+#Liste des mots de df qui font partie de la stopword_list
+stopwords_in_df <- df_words %>%
+  semi_join(stopwords_list, by = c("word" = "word"))
+
+#Enlever ces mots de df_words
+df_words_clean <- df_words %>%
+  anti_join(stopwords_list, by = c("word" = "word"))
+
+#Suppression des mots d'un seul caractère 
+df_words_clean <- df_words_clean %>%
+  filter(nchar(word) > 1)
+```
+
+## Décompte des mots les plus fréquents dans le corpus
+
+```{r echo=FALSE, cache=TRUE}
+#Top 30 mots les plus fréquents dans tout le corpus
+top_words_corpus <- df_words_clean %>%
+  count(word, sort = TRUE) %>%
+  slice_max(n, n = 30)
+
+#Représentation graphique 
+ggplot(top_words_corpus, aes(x = reorder(word, n), y = n)) +
+  geom_col(fill = "skyblue", color="black") +
+  coord_flip() +
+  labs(title = "Top 30 des mots les plus fréquents dans le corpus",
+       x = "Mots",
+       y = "Fréquence") +
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Décompte des mots les plus fréquents dans le corpus
+
+```{r echo=FALSE}
+top_words_corpus
+```
+
+## Décompte des mots les plus fréquents par note
+
+```{r echo=FALSE}
+top_words_by_rating <- df_words_clean %>%
+  group_by(Rating, word) %>%
+  count() %>%
+  group_by(Rating) %>%
+  slice_max(n, n = 10) %>%
+  arrange(Rating, desc(n))
+
+#Représentation graphique 
+ggplot(top_words_by_rating, aes(x = reorder_within(word, n, Rating), y = n, fill = as.factor(Rating))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ Rating, scales = "free_y") +
+  coord_flip() +
+  scale_x_reordered() +
+  labs(
+    title = "Top 10 des mots les plus fréquents par note",
+    x = "Mots",
+    y = "Fréquence",
+    fill = "Note"
+  ) +
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Term Frequency - Inverse Document Frequency
+
+Les mêmes mots reviennent indépendamment de la note attribuée, c'est pourquoi il faut parvenir à pondérer les mots propres à chaque note afin de faire ressortir des tendances.
+
+Pour ce faire on utilise la méthode du \textbf{TF-IDF}.
+
+## Term Frequency - Inverse Document Frequency
+
+### Term Frequency (TF)}
+
+$$\text{TF}(t,d) = \frac{\text{Nombre d'occurrences de } t \text{ dans } d}{\text{Nombre total de mots dans } d}$$
+
+### Inverse Document Frequency (IDF)
+
+$$\text{IDF}(t, D) = \log \left( \frac{\text{Nombre total de documents dans } D}{\text{Nombre de documents contenant } t} \right)$$
+
+### TF-IDF
+
+$$\text{TF-IDF}(t, d, D) = \text{TF}(t, d) \times \text{IDF}(t, D)$$
+
+Où \textit{t} est le terme, \textit{d} le document et \textit{D} le corpus de documents.
+
+## Décompte des mots les plus fréquents par note (après TF-IDF)
+
+```{r include=FALSE}
+#Filtrage et calcul du TF-IDF amélioré
+tf_idf_words <- df_words_clean %>%
+  # Compter la fréquence totale de chaque mot
+  group_by(word) %>%
+  mutate(total_occurrences = n()) %>%
+  ungroup() %>%
+  # Filtrer pour garder uniquement les mots qui :
+  filter(
+    # Apparaissent au moins X fois dans l'ensemble du corpus
+    total_occurrences >= 20,
+    # Ont une longueur minimum
+    str_length(word) >= 3,
+    # Ne contiennent que des lettres (retire les caractères spéciaux)
+    str_detect(word, "^[a-z]+$")
+  ) %>%
+  # Continuer avec le calcul TF-IDF
+  count(Rating, word) %>%
+  bind_tf_idf(word, Rating, n) %>%
+  group_by(Rating) %>%
+  slice_max(tf_idf, n = 10, with_ties = FALSE) %>%
+  arrange(Rating, desc(tf_idf))
+```
+
+```{r echo=FALSE}
+ggplot(tf_idf_words, aes(x = reorder_within(word, tf_idf, Rating), y = tf_idf, fill = as.factor(Rating))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ Rating, scales = "free_y") +
+  coord_flip() +
+  scale_x_reordered() +
+  labs(
+    title = "Top 10 des mots les plus fréquents par note (TF-IDF)",
+    x = "Mots",
+    y = "Fréquence",
+    fill = "Note"
+  ) +
+  theme_minimal()+
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_blank()
+  )
+```
+
+## Décompte des mots les plus fréquents par note (après TF-IDF)
+
+On constate que les mots qui reviennent le plus souvent dans les bonnes notes (5/5) sont des noms propres. En réalité il s'agit du personnel des bars-restaurants qui sont souvent cités dans ces commentaires.
+
+On constate des mots comme : "insulted", "unethical", "vomiting" parmi les mauvaises notes (1/5).
+
+\begin{alertblock}{Orientation}
+Pourrait être intéressant de faire de la reconnaissance d'entités nommées (NER) pour regarder dans notre corpus, quels bar-restaurants reçoivent des bonnes ou des mauvaises notes
+\end{alertblock}
+
+# Création d'un modèle d'estimation des notes
+
+L'idée est d'entrainer un modèle simple sur une partie de la df (80%) afin d'observer s'il parvient à estimer les notes attribuées aux commentaires restants (20%) sur la seule base des mots qui les composent.
+
+Pour ce faire je vais :
+
+-   diviser aléatoirement les commentaires en un ensemble d'entraînement et en un ensemble de test ;
+
+-   préparer les données avec la fonction recipe() du package textrecipes (on limite notamment la taille des commentaires à 1000 mots) ;
+
+-   configuer le contrôle d'entrainement (définir le nombre de sous-ensemble de la base d'entrainement pour améliorer la fiabilité de l'entrainement, la méthode de vérification de l'entrainement etc..) ;
+
+-   lancer l'entrainement ;
+
+-   évaluer le modèle.
+
+```{r include=FALSE}
+# 1. Préparation des données
+# Diviser les données en ensembles d'entraînement et de test
+set.seed(123) 
+indices_train <- createDataPartition(df$Rating, p = 0.8, list = FALSE)
+train_data <- df[indices_train, ]
+test_data <- df[-indices_train, ]
+
+# 2. Préparation du texte avec une recette
+recipe_text <- recipe(Rating ~ Review, data = train_data) %>%
+  step_tokenize(Review) %>%
+  step_stopwords(Review) %>%
+  step_tokenfilter(Review, max_tokens = 1000) %>%
+  step_tfidf(Review)
+
+# 3. Configuration du contrôle d'entraînement
+ctrl <- trainControl(
+  method = "cv",        # Validation croisée
+  number = 5,          # Nombre de plis
+  verboseIter = TRUE   # Pour voir la progression
+)
+```
+
+```{r include=FALSE}
+model_glm <- readRDS("C:/Users/paulf/OneDrive/Documents/7. Doctorat/4. Projet IA notes tripadvisor/Hotel-grade-review-prediction/model_glm.rds")
+```
+
+```{r include=FALSE}
+# 5. Évaluation du modèle
+# Prédictions sur l'ensemble de test
+predictions <- predict(model_glm, newdata = test_data)
+```
+
+## Création d'un modèle d'estimation des notes
+
+\begin{alertblock}{Attention}
+  Bien que l'on se soit intéressé à la fréquence d'apparition de chaque mot du corpus dans la partie précédente, l'entrainement du modèle se fait non pas par mot mais par commentaire.
+\end{alertblock}
+
+## Résultats du modèle
+
+```{r include=FALSE}
+
+test_data$Rating <- as.factor(test_data$Rating) 
+# Matrice de confusion
+confusionMatrix(predictions, test_data$Rating)
+```
+
+```{r echo=FALSE}
+# Prédictions sur l'ensemble de test
+conf_matrix <- confusionMatrix(predictions, test_data$Rating)
+
+# Visualisation de la matrice de confusion
+#Pas bonne car ne montre pas vraiment ce que je veux
+conf_matrix_df <- as.data.frame(conf_matrix$table)
+
+ggplot(conf_matrix_df, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "blue") +
+  geom_text(aes(label = Freq)) +
+  theme_minimal() +
+  labs(title = "Matrice de Confusion",
+       x = "Note réelle",
+       y = "Note prédite")+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Notions importantes d'évaluation d'un modèle
+
+Comme vu dans la slide précédente, une situation paradoxale peut apparaître lorsque l'on cherche à évaluer un modèle de classification. En effet, le modèle semble être bon lorsqu'il prédit une note or pour certaines notes le modèle semble se tromper plus souvent qu'il n'a raison (par exemple pour les notes 2 et 3).
+
+C'est pourquoi lorsque l'on évalue un modèle de classification il est indispensable de différencier la \textit{\textbf{précision}} et le \textit{\textbf{recall}}.
+
+## Notions importantes d'évaluation d'un modèle
+
+\begin{block}{Précision}
+Mesure la proportion de vrais positifs parmi les prédictions positives. Un modèle avec une précision élevée fait peu de faux positifs, mais peut manquer de nombreux vrais positifs.
+\end{block}
+\begin{block}{Recall}
+Mesure la proportion de vrais positifs parmi les réels positifs. Un modèle avec un recall élevé détecte la plupart des vrais positifs, mais peut faire beaucoup de faux positifs
+\end{block}
+
+Pour palier à ce problème on utilise régulièrement le score F1.
+
+\begin{block}{F1}
+Moyenne harmonique de la \textit{Précision} et du \textit{Recall}.
+\end{block}
+
+## Résultats du modèle
+
+```{r echo=FALSE}
+# Calculer précision, rappel et F1-score par classe
+perf_by_class <- data.frame(
+  Classe = levels(test_data$Rating),
+  Précision = conf_matrix$byClass[,"Precision"],
+  Rappel = conf_matrix$byClass[,"Recall"],
+  F1 = conf_matrix$byClass[,"F1"]
+)
+
+# Visualisation en barres groupées
+perf_by_class_long <- tidyr::pivot_longer(perf_by_class, 
+                                          cols = c("Précision", "Rappel", "F1"),
+                                          names_to = "Métrique",
+                                          values_to = "Valeur")
+
+ggplot(perf_by_class_long, aes(x = Classe, y = Valeur, fill = Métrique)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() +
+  labs(title = "Métriques de performance par classe",
+       x = "Note",
+       y = "Score")+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Conclusion
+
+Le modèle est plus performant pour la prédiction des notes 1, 4 et 5. À noter que pour la note 1 il a quand même eu un échantillon très réduit pour s'entrainer.
+
+J'ai entrainé le modèle selon une méthode relativement simple qui est la régression logistique classique. L'objectif est seulement de chercher une relation linéaire entre les mots et la probabilité de chaque note.
+
+\begin{alertblock}{Orientation}
+  Si à l'avenir je suis amené à réentrainer des modèles il est nécessaire de mieux maitriser les formules derrière les différentes méthodes. 
+  Il serait intéréssant (et faisable à moindre coût) d'entrainer des modèles selon d'autres méthodologies (modèles bayesiens, k-plus proches voisins etc..) mais je n'ai pas réussi à le faire avec mon PC en raison de la RAM limitée. 
+\end{alertblock}
+
+```{r eval=FALSE, include=FALSE}
+plot(model_glm$finalModel, xvar = "lambda", label = TRUE)
+
+```
+
+```{r eval=FALSE, include=FALSE}
+plot(model_glm)
+```
+
+# Conclusion
+
+Cette petite mise en pratique m'a permis de me refaire la main sur R, de découvrir Rmd, d'apprendre ce qu'est le TF-IDF et de manipuler les critères d'évaluation d'un modèle de classification.
+
+Il m'a également permis de naviguer sur Hugging face et d'en apprendre un peu sur les différentes méthodologies d'estimation.
+
+Ce travail manque toutefois cruellement d'un support théorique, d'une problématique, d'un terrain mieux documenté etc.. pour pouvoir réellement être intéressant du point de vue de la recherche.
