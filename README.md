@@ -1,14 +1,15 @@
 # Hotel grade review prediction
 
 ## Contexte 
-*Officiellement ce projet a pour objectif d’explorer la relation qu’il existe
+**Officiellement** ce projet a pour objectif d’explorer la relation qu’il existe
 entre un commentaire et la note que les clients laissent sur Tripadvisor.
-Officieusement ce projet était surtout un cas pratique me permettant de
-reprendre en main différents outils tels que R et Rmd.*
+**Officieusement** ce projet était surtout un cas pratique me permettant de
+reprendre en main différents outils tels que R et Rmd.
 
 La base de données New_Delhi_reviews provient de 
 [Kaggle](https://www.kaggle.com/datasets/arnabchaki/tripadvisor-reviews-2023).
 
+Le modèle linéaire construit dans le cadre de ce projet est stocké dans ce dépôt sur Huggingface : [Paulfvr/glmmodelTripadvisor](https://huggingface.co/Paulfvr/glmmodelTripadvisor)
 ## Structure du dépôt
 Le dépôt contient quatre fichiers (hors README.md).
 
